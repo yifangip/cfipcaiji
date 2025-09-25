@@ -33,7 +33,7 @@ jobs:
         keep_minimum_runs: 6
         
     - name: Run script
-      run: python ${{ github.workspace }}/collect_ips.py
+      run: python ${{ github.workspace }}/collect_ips_old.py
         
     - name: Commit and push changes
       run: |
