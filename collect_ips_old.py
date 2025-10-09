@@ -2,11 +2,12 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import os
+from datetime import datetime
 
 # ============ 配置区域 ============
-# Telegram 推送配置
-BOT_TOKEN = os.environ.get("BOT_TOKEN")  # Telegram Bot Token
-CHAT_ID = os.environ.get("CHAT_ID")      # 你的Telegram聊天ID
+# Telegram 推送配置（从 GitHub Secrets 环境变量中读取）
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+CHAT_ID = os.environ.get("CHAT_ID")
 
 # 目标URL列表
 urls = [
@@ -14,7 +15,7 @@ urls = [
     'https://ip.164746.xyz'
 ]
 
-# 匹配 IPv4 地址的正则
+# 匹配 IPv4 地址
 ip_pattern = r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}'
 # 输出文件
 output_file = 'ip.txt'
@@ -31,10 +32,12 @@ def send_tg_message(text):
     data = {
         "chat_id": CHAT_ID,
         "text": text,
-        "parse_mode": "HTML"
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True
     }
+
     try:
-        response = requests.post(url, data=data, timeout=10)
+        response = requests.post(url, data=data, timeout=15)
         if response.status_code == 200:
             print("✅ Telegram 推送成功。")
         else:
@@ -45,29 +48,22 @@ def send_tg_message(text):
 
 def fetch_ips():
     """抓取网页中的 IP 地址"""
-    all_ips = set()  # 去重
+    all_ips = set()
     for url in urls:
         print(f"正在抓取: {url}")
         try:
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, timeout=15)
             soup = BeautifulSoup(response.text, 'html.parser')
 
-            # 根据网站结构提取
-            if '164746' in url:
-                elements = soup.find_all('tr')
-            else:
-                elements = soup.find_all(['li', 'tr'])
-
+            elements = soup.find_all(['li', 'tr'])
             for element in elements:
                 element_text = element.get_text()
                 ip_matches = re.findall(ip_pattern, element_text)
                 for ip in ip_matches:
                     all_ips.add(ip)
-
         except Exception as e:
             print(f"❌ 抓取 {url} 失败: {e}")
-
-    return sorted(list(all_ips))
+    return sorted(all_ips)
 
 
 def main():
@@ -83,16 +79,27 @@ def main():
         for ip in ips:
             f.write(ip + '\n')
 
-    # 输出与推送
-    msg = f"✅ 共获取到 <b>{len(ips)}</b> 个 IP 地址。\n"
-    if ips:
-        preview = "\n".join(ips[:5])
-        msg += f"<b>前5个示例：</b>\n<code>{preview}</code>"
-    else:
-        msg += "未抓取到任何IP。"
+    # 生成时间戳
+    now_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    print(msg)
-    send_tg_message(msg)
+    # 构造推送文本
+    if ips:
+        ip_list_text = "\n".join(ips)
+        message = (
+            f"📡 <b>Cloudflare IP 更新通知</b>\n"
+            f"🕒 <b>更新时间：</b>{now_time}\n"
+            f"📦 <b>共收集：</b>{len(ips)} 个 IP\n\n"
+            f"<b>全部IP如下：</b>\n"
+            f"<code>{ip_list_text}</code>"
+        )
+    else:
+        message = (
+            f"⚠️ <b>未获取到任何IP地址</b>\n"
+            f"🕒 <b>检测时间：</b>{now_time}"
+        )
+
+    print(message)
+    send_tg_message(message)
 
 
 if __name__ == "__main__":
