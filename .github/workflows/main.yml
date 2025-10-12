@@ -29,7 +29,7 @@ jobs:
 
       - name: 🚀 运行 Cloudflare IP 抓取与推送脚本
         run: |
-          python main.py
+          python collect_ips_old.py
 
       - name: 📤 上传结果文件（可选）
         if: success()
