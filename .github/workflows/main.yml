@@ -1,52 +1,39 @@
-name: Update IP List
+name: Cloudflare IP 自动更新推送
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # 每天凌晨2点执行
-  workflow_dispatch:  # 允许手动触发
+    - cron: '0 18 * * *'  # 每天北京时间凌晨2点运行（UTC 18:00）
+  workflow_dispatch:       # 手动触发按钮（可选）
 
 jobs:
-  update-ip-list:
+  update:
     runs-on: ubuntu-latest
-
-    # === 环境变量部分 ===
     env:
-      BOT_TOKEN: ${{ secrets.BOT_TOKEN }}  # 从仓库Secrets读取
+      TZ: Asia/Shanghai    # 设置时区为北京时间（脚本时间自动对齐）
+      BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
       CHAT_ID: ${{ secrets.CHAT_ID }}
 
     steps:
-      - uses: actions/checkout@v3
+      - name: 📦 检出仓库代码
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: 🐍 设置 Python 环境
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.x'
 
-      - name: Install dependencies
+      - name: 🔧 安装依赖
         run: |
           python -m pip install --upgrade pip
-          pip install requests
-          pip install beautifulsoup4
+          pip install requests beautifulsoup4
 
-      - name: Delete workflow runs
-        uses: Mattraks/delete-workflow-runs@v2
-        with:
-          token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          retain_days: 2
-          keep_minimum_runs: 6
-
-      - name: Run script
-        run: python ${{ github.workspace }}/collect_ips_old.py
-
-      - name: Commit and push changes
+      - name: 🚀 运行 Cloudflare IP 抓取与推送脚本
         run: |
-          git config --local user.email "actions@github.com"
-          git config --local user.name "GitHub Action"
-          if [ -n "$(git status --porcelain)" ]; then
-            git add ip.txt
-            git commit -m "Automatic update"
-            git push
-          else
-            echo "No changes detected, skipping commit."
-          fi
+          python main.py
+
+      - name: 📤 上传结果文件（可选）
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ip-list
+          path: ip.txt
