@@ -4,7 +4,6 @@ from bs4 import BeautifulSoup
 import re
 import os
 from datetime import datetime
-import sys
 
 # ============ 配置区域 ============
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -86,14 +85,22 @@ def fetch_ips():
 def main():
     print("🚀 开始执行 Cloudflare IP 抓取任务...")
     
-    # 删除旧文件
+    # 读取旧IP列表（用于比较）
+    old_ips = set()
     if os.path.exists(output_file):
-        os.remove(output_file)
-        print("🗑️ 已删除旧文件")
+        with open(output_file, 'r', encoding='utf-8') as f:
+            old_ips = set(line.strip() for line in f if line.strip())
+        print(f"📁 原文件中有 {len(old_ips)} 个IP")
     
     # 抓取新IP
     ips = fetch_ips()
-    print(f"📊 抓取到的IP列表: {ips}")
+    new_ips = set(ips)
+    
+    # 计算变化
+    added_ips = new_ips - old_ips
+    removed_ips = old_ips - new_ips
+    
+    print(f"📊 新增IP: {len(added_ips)} 个, 移除IP: {len(removed_ips)} 个")
     
     # 写入文件
     with open(output_file, 'w', encoding='utf-8') as f:
@@ -101,36 +108,22 @@ def main():
             f.write(ip + '\n')
     print("💾 IP已写入文件")
     
-    # 重新读取验证
-    try:
-        with open(output_file, 'r', encoding='utf-8') as f:
-            file_content = f.read().strip()
-            file_ips = file_content.split('\n') if file_content else []
-        
-        print(f"📄 文件实际内容: {file_content}")
-        print(f"📋 从文件读取的IP列表: {file_ips}")
-        
-        # 对比两个列表
-        if set(ips) != set(file_ips):
-            print("⚠️ 警告: 内存中的IP与文件中的IP不一致!")
-            print(f"内存IP: {sorted(ips)}")
-            print(f"文件IP: {sorted(file_ips)}")
-        else:
-            print("✅ 文件内容验证通过")
-            
-    except Exception as e:
-        print(f"❌ 读取文件失败: {e}")
-    
     # 生成时间戳
     now_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     # 构造推送文本
     if ips:
         ip_list_text = "\n".join(ips)
+        
+        # 如果有变化，在消息中标注
+        change_info = ""
+        if added_ips or removed_ips:
+            change_info = f"\n🔄 <b>变化情况：</b>新增 {len(added_ips)} 个，移除 {len(removed_ips)} 个"
+        
         message = (
             f"📡 <b>Cloudflare IP 更新通知</b>\n"
             f"🕒 <b>更新时间：</b>{now_time}\n"
-            f"📦 <b>共收集：</b>{len(ips)} 个 IP\n\n"
+            f"📦 <b>共收集：</b>{len(ips)} 个 IP{change_info}\n\n"
             f"<b>全部IP如下：</b>\n"
             f"<code>{ip_list_text}</code>"
         )
